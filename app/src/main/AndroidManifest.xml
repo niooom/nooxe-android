@@ -68,6 +68,10 @@
             android:exported="false"
             android:foregroundServiceType="microphone|camera|mediaPlayback" />
 
+        <receiver
+            android:name=".call.CallActionReceiver"
+            android:exported="false" />
+
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="nooxe_messages" />
