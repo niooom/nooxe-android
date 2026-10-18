@@ -1,0 +1,50 @@
+name: Android APK
+
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-apk
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Gradle with cache
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Build APK
+        run: gradle assembleDebug --no-daemon -PbuildNumber=$GITHUB_RUN_NUMBER
+
+      - name: Update the single release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -e
+          TAG=latest
+          cp app/build/outputs/apk/debug/app-debug.apk Nooxe.apk
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" Nooxe.apk --clobber
+          else
+            gh release create "$TAG" Nooxe.apk --title "Nooxe Android" --latest
+          fi
+          gh release edit "$TAG" --notes "Nooxe Android - build #$GITHUB_RUN_NUMBER"
