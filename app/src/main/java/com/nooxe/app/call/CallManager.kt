@@ -184,6 +184,15 @@ object CallManager {
 
         if (incoming) {
             scheduleMissTimeout(app)
+            // Shows the call screen right away when the app is open; when the
+            // phone is locked or the app is closed the full screen notification
+            // brings it up instead.
+            runCatching {
+                context.startActivity(
+                    Intent(context, CallActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                )
+            }
         } else {
             runCatching {
                 context.startActivity(
@@ -334,7 +343,13 @@ object CallManager {
 
     private fun scheduleMissTimeout(context: Context) {
         clearMissTimeout()
-        val runnable = Runnable { endLocally(context) }
+        val runnable = Runnable {
+            val current = data
+            if (current != null) {
+                postAction(current, "end")
+            }
+            endLocally(context)
+        }
         missTimeout = runnable
         handler.postDelayed(runnable, MISS_TIMEOUT_MS)
     }
