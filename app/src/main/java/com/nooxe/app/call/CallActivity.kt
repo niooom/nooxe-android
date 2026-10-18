@@ -2,6 +2,7 @@ package com.nooxe.app.call
 
 import android.Manifest
 import android.app.Activity
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.Build
 import android.os.Bundle
@@ -15,6 +16,11 @@ import io.livekit.android.renderer.SurfaceViewRenderer
 
 /** The call screen: ringing, connecting and the live audio or video call. */
 class CallActivity : Activity() {
+
+    companion object {
+        /** Set by the "গ্রহণ" button on the ringing notification. */
+        const val EXTRA_ANSWER = "answer"
+    }
 
     private val handler = Handler(Looper.getMainLooper())
 
@@ -83,6 +89,19 @@ class CallActivity : Activity() {
         CallManager.listener = { render() }
         render()
         requestCallPermissions()
+
+        // Answered straight from the notification.
+        if (intent?.getBooleanExtra(EXTRA_ANSWER, false) == true) {
+            CallManager.accept(this)
+        }
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent?.getBooleanExtra(EXTRA_ANSWER, false) == true) {
+            CallManager.accept(this)
+        }
     }
 
     override fun onResume() {
