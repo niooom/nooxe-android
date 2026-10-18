@@ -27,6 +27,7 @@ import java.net.URL
 object CallManager {
 
     private const val MISS_TIMEOUT_MS = 45000L
+    private const val RING_TIMEOUT_MS = 60000L
 
     var data: CallData? = null
         private set
@@ -58,6 +59,7 @@ object CallManager {
     private var remoteRendererReady = false
     private var localRendererReady = false
     private var missTimeout: Runnable? = null
+    private var ringTimeout: Runnable? = null
 
     fun isVideo(): Boolean {
         val current = data
@@ -68,6 +70,9 @@ object CallManager {
 
     fun startOutgoing(context: Context, payload: String) {
         handler.post {
+            // Already ringing or talking: a call button tapped in the chat page
+            // must never disturb the call that is already running.
+            if (phase != CallPhase.IDLE) return@post
             val parsed = CallData.fromJson(payload)
             if (parsed == null) {
                 // The server refused the call because the other person is busy.
@@ -259,6 +264,7 @@ object CallManager {
                 )
             }
             connect(app, parsed)
+            scheduleRingTimeout(app)
         }
         announce()
     }
@@ -313,6 +319,7 @@ object CallManager {
             }
             is RoomEvent.ParticipantConnected -> {
                 peerJoined = true
+                clearRingTimeout()
             }
             is RoomEvent.ParticipantDisconnected -> {
                 handler.postDelayed({
@@ -376,6 +383,12 @@ object CallManager {
 
     private fun endLocally(context: Context) {
         clearMissTimeout()
+        clearRingTimeout()
+        val finished = data
+        if (finished != null && phase != CallPhase.BUSY) {
+            // The server must never keep a call the phones have already let go of.
+            postAction(finished, "end")
+        }
         Ringer.stop()
         CallService.stop(context)
         CallNotification.cancelAll(context)
@@ -416,6 +429,26 @@ object CallManager {
     private fun clearMissTimeout() {
         val runnable = missTimeout
         missTimeout = null
+        if (runnable != null) {
+            handler.removeCallbacks(runnable)
+        }
+    }
+
+    /** Nobody picked up in time: hang up so both phones and the server clean up. */
+    private fun scheduleRingTimeout(context: Context) {
+        clearRingTimeout()
+        val runnable = Runnable {
+            if (!peerJoined) {
+                endLocally(context)
+            }
+        }
+        ringTimeout = runnable
+        handler.postDelayed(runnable, RING_TIMEOUT_MS)
+    }
+
+    private fun clearRingTimeout() {
+        val runnable = ringTimeout
+        ringTimeout = null
         if (runnable != null) {
             handler.removeCallbacks(runnable)
         }
