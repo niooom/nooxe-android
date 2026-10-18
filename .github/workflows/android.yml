@@ -2,6 +2,8 @@ name: Android APK
 
 on:
   push:
+    paths-ignore:
+      - 'keystore/**'
   workflow_dispatch:
 
 permissions:
@@ -10,6 +12,9 @@ permissions:
 concurrency:
   group: android-apk
   cancel-in-progress: true
+
+env:
+  KEYSTORE_PASSWORD: nooxe-signing-2026-v1
 
 jobs:
   build:
@@ -36,8 +41,39 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Signing key
+        run: |
+          set -e
+          if [ ! -f keystore/nooxe-release.jks ]; then
+            mkdir -p keystore
+            keytool -genkeypair -v \
+              -keystore keystore/nooxe-release.jks \
+              -alias nooxe \
+              -keyalg RSA -keysize 2048 -validity 10950 \
+              -storepass "$KEYSTORE_PASSWORD" -keypass "$KEYSTORE_PASSWORD" \
+              -dname "CN=Nooxe, OU=Nooxe, O=Nooxe, L=Dhaka, C=BD"
+            git config user.name "nooxe-builder"
+            git config user.email "nooxe-builder@users.noreply.github.com"
+            git add keystore/nooxe-release.jks
+            git commit -m "Add the permanent signing key"
+            git push
+          fi
+
       - name: Build APK
-        run: gradle assembleDebug --no-daemon -PbuildNumber=$GITHUB_RUN_NUMBER
+        run: |
+          set -e
+          gradle assembleRelease --no-daemon -PbuildNumber=$GITHUB_RUN_NUMBER
+          SDK="${ANDROID_HOME:-/usr/local/lib/android/sdk}"
+          BT="$SDK/build-tools/34.0.0"
+          OUT=app/build/outputs/apk/release
+          "$BT/zipalign" -f -p 4 "$OUT/app-release-unsigned.apk" "$OUT/Nooxe-aligned.apk"
+          "$BT/apksigner" sign \
+            --ks keystore/nooxe-release.jks \
+            --ks-key-alias nooxe \
+            --ks-pass "pass:$KEYSTORE_PASSWORD" \
+            --key-pass "pass:$KEYSTORE_PASSWORD" \
+            --out "$OUT/Nooxe.apk" "$OUT/Nooxe-aligned.apk"
+          "$BT/apksigner" verify --print-certs "$OUT/Nooxe.apk" | head -4 || true
 
       - name: Update the single release
         env:
@@ -45,7 +81,7 @@ jobs:
         run: |
           set -e
           TAG=latest
-          cp app/build/outputs/apk/debug/app-debug.apk Nooxe.apk
+          cp app/build/outputs/apk/release/Nooxe.apk Nooxe.apk
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" Nooxe.apk --clobber
           else

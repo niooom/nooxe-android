@@ -2,7 +2,7 @@ package com.nooxe.app.call
 
 import org.json.JSONObject
 
-enum class CallPhase { IDLE, RINGING, CONNECTING, ACTIVE }
+enum class CallPhase { IDLE, RINGING, CONNECTING, ACTIVE, BUSY }
 
 /** Everything one call needs: who it is with, and how to join the room. */
 data class CallData(

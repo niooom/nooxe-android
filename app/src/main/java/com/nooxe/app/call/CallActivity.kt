@@ -123,6 +123,10 @@ class CallActivity : Activity() {
     }
 
     private fun render() {
+        if (CallManager.phase == CallPhase.BUSY) {
+            renderBusy()
+            return
+        }
         val data = CallManager.data
         if (data == null || CallManager.phase == CallPhase.IDLE) {
             if (!isFinishing) finish()
@@ -152,6 +156,22 @@ class CallActivity : Activity() {
         muteButton.setBackgroundResource(if (CallManager.muted) R.drawable.bg_call_off else R.drawable.bg_call_round)
         cameraButton.setBackgroundResource(if (CallManager.videoOn) R.drawable.bg_call_round else R.drawable.bg_call_off)
         speakerButton.setBackgroundResource(if (CallManager.speakerOn) R.drawable.bg_call_on else R.drawable.bg_call_round)
+    }
+
+    private fun renderBusy() {
+        val peer = if (CallManager.busyName.isEmpty()) "Nooxe" else CallManager.busyName
+        nameView.text = peer
+        avatarView.text = initials(peer)
+        statusView.text = "ব্যস্ত"
+        topName.text = peer
+        topStatus.text = "ব্যস্ত"
+        remoteVideo.visibility = View.GONE
+        localVideo.visibility = View.GONE
+        audioPanel.visibility = View.VISIBLE
+        topBar.visibility = View.GONE
+        incomingRow.visibility = View.GONE
+        activeRow.visibility = View.GONE
+        cameraBlock.visibility = View.GONE
     }
 
     private fun statusLabel(data: CallData, ringing: Boolean): String {

@@ -46,6 +46,8 @@ object CallManager {
         private set
     var problem = ""
         private set
+    var busyName = ""
+        private set
     var listener: (() -> Unit)? = null
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
@@ -67,19 +69,31 @@ object CallManager {
     fun startOutgoing(context: Context, payload: String) {
         handler.post {
             val parsed = CallData.fromJson(payload)
-            if (parsed != null) {
-                begin(context, parsed, false)
+            if (parsed == null) {
+                // The server refused the call because the other person is busy.
+                val status = runCatching { JSONObject(payload).optString("status") }.getOrDefault("")
+                if (status == "busy") {
+                    val name = runCatching { JSONObject(payload).optString("peer_name") }.getOrDefault("")
+                    showBusy(context, name)
+                }
+                return@post
             }
+            begin(context, parsed, false)
         }
     }
 
     fun handleIncoming(context: Context, push: Map<String, String>?) {
         handler.post {
-            if (phase != CallPhase.IDLE) return@post
-            val parsed = CallData.fromPush(push)
-            if (parsed != null) {
-                begin(context, parsed, true)
+            val parsed = CallData.fromPush(push) ?: return@post
+            if (phase != CallPhase.IDLE) {
+                // Already ringing or talking: turn the new call down straight away
+                // so the caller is not left waiting.
+                if (parsed.callId != data?.callId) {
+                    postAction(parsed, "decline")
+                }
+                return@post
             }
+            begin(context, parsed, true)
         }
     }
 
@@ -99,6 +113,32 @@ object CallManager {
     }
 
     // ---------- what the call screen calls ----------
+
+    /** The person we called is already on another call. */
+    private fun showBusy(context: Context, peerName: String) {
+        busyName = peerName
+        data = null
+        peerJoined = false
+        hasRemoteVideo = false
+        muted = false
+        videoOn = false
+        speakerOn = false
+        startedAt = 0L
+        problem = ""
+        phase = CallPhase.BUSY
+        runCatching {
+            context.startActivity(
+                Intent(context, CallActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            )
+        }
+        announce()
+        handler.postDelayed({
+            if (phase == CallPhase.BUSY) {
+                endLocally(context)
+            }
+        }, 4000L)
+    }
 
     fun accept(context: Context) {
         handler.post {
@@ -125,6 +165,10 @@ object CallManager {
 
     fun hangUp(context: Context) {
         handler.post {
+            if (phase == CallPhase.BUSY) {
+                endLocally(context)
+                return@post
+            }
             val current = data ?: return@post
             postAction(current, "end")
             endLocally(context)
@@ -169,6 +213,20 @@ object CallManager {
     // ---------- the call itself ----------
 
     private fun begin(context: Context, parsed: CallData, incoming: Boolean) {
+        val existing = data
+        if (existing != null && existing.callId == parsed.callId && phase != CallPhase.IDLE) {
+            // Both called each other at the same moment: this is the call that is
+            // already on screen, so just join it.
+            data = parsed
+            clearMissTimeout()
+            Ringer.stop()
+            CallNotification.cancelIncoming(context)
+            CallService.showOngoing(context, parsed)
+            phase = CallPhase.CONNECTING
+            connect(context.applicationContext, parsed)
+            announce()
+            return
+        }
         data = parsed
         phase = if (incoming) CallPhase.RINGING else CallPhase.CONNECTING
         muted = false
@@ -335,6 +393,7 @@ object CallManager {
         restoreAudio(context)
         phase = CallPhase.IDLE
         data = null
+        busyName = ""
         peerJoined = false
         hasRemoteVideo = false
         startedAt = 0L
