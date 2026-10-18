@@ -37,6 +37,7 @@ public class MainActivity extends Activity {
 
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
+    private boolean clearHistoryAfterLoad = false;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -70,6 +71,16 @@ public class MainActivity extends Activity {
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 return handleNavigation(Uri.parse(url));
+            }
+
+            // A finished sign-in is a fresh start, so the sign-in page is dropped
+            // from the back stack instead of showing up after login.
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                if (clearHistoryAfterLoad) {
+                    clearHistoryAfterLoad = false;
+                    view.clearHistory();
+                }
             }
         });
 
@@ -205,6 +216,7 @@ public class MainActivity extends Activity {
         if (isNewUser != null && !isNewUser.isEmpty()) {
             target.appendQueryParameter("is_new_user", isNewUser);
         }
+        clearHistoryAfterLoad = true;
         webView.loadUrl(target.build().toString());
         return true;
     }
