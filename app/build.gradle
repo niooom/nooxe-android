@@ -30,4 +30,10 @@ android {
 
 dependencies {
     implementation 'androidx.browser:browser:1.8.0'
+    implementation 'com.google.firebase:firebase-messaging:24.0.0'
+}
+
+// Wired up automatically as soon as the Firebase config file is part of the repo.
+if (file('google-services.json').exists()) {
+    apply plugin: 'com.google.gms.google-services'
 }
