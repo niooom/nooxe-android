@@ -1,5 +1,6 @@
 plugins {
     id 'com.android.application'
+    id 'org.jetbrains.kotlin.android'
 }
 
 def buildNo = (project.findProperty('buildNumber') ?: '1').toString().toInteger()
@@ -26,11 +27,17 @@ android {
         sourceCompatibility JavaVersion.VERSION_17
         targetCompatibility JavaVersion.VERSION_17
     }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
 }
 
 dependencies {
     implementation 'androidx.browser:browser:1.8.0'
     implementation 'com.google.firebase:firebase-messaging:24.0.0'
+    // LiveKit powers the audio and video call screens.
+    implementation 'io.livekit:livekit-android:2.29.0'
 }
 
 // Wired up automatically as soon as the Firebase config file is part of the repo.
