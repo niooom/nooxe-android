@@ -239,25 +239,23 @@ public class MainActivity extends Activity {
     }
 
     // Points the sign-in's from_url at the page that hands the finished session
-    // back to this app, so it does not get stranded inside the browser.
+    // back to this app, so it does not get stranded inside the browser. The link is
+    // passed on exactly as it arrived: rebuilding it re-encodes every value, which
+    // turns "consent select_account" into "consent+select_account" and Google then
+    // refuses the page with "Invalid parameter value for prompt".
     private Uri withAuthReturn(Uri uri) {
         try {
-            Uri.Builder builder = uri.buildUpon().clearQuery();
-            boolean replaced = false;
-            for (String name : uri.getQueryParameterNames()) {
-                if ("from_url".equals(name)) {
-                    replaced = true;
-                    builder.appendQueryParameter(name, AUTH_RETURN_URL);
-                } else {
-                    for (String value : uri.getQueryParameters(name)) {
-                        builder.appendQueryParameter(name, value);
-                    }
-                }
+            String raw = uri.toString();
+            String encoded = Uri.encode(AUTH_RETURN_URL);
+            if (raw.contains("from_url=")) {
+                raw = raw.replaceAll("from_url=[^&#]*", "from_url=" + java.util.regex.Matcher.quoteReplacement(encoded));
+            } else if (uri.getPath() != null && uri.getPath().startsWith(AUTH_PATH_PREFIX)) {
+                raw = raw + (raw.contains("?") ? "&" : "?") + "from_url=" + encoded;
             }
-            if (!replaced && uri.getPath() != null && uri.getPath().startsWith(AUTH_PATH_PREFIX)) {
-                builder.appendQueryParameter("from_url", AUTH_RETURN_URL);
-            }
-            return builder.build();
+            // Google reads the prompt as space separated values, so a stray "+"
+            // inside it has to become a real space encoding.
+            raw = raw.replaceAll("(prompt=[^&#]*?)\\+", "$1%20");
+            return Uri.parse(raw);
         } catch (Exception error) {
             return uri;
         }
