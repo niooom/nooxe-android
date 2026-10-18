@@ -69,6 +69,9 @@ public class MainActivity extends Activity {
         settings.setLoadWithOverviewMode(true);
         settings.setUserAgentString(USER_AGENT);
 
+        // The chat page uses this to hand a call to the native call screens.
+        webView.addJavascriptInterface(new NooxeCallBridge(this), "AndroidBridge");
+
         webView.setWebViewClient(new WebViewClient() {
 
             @Override
