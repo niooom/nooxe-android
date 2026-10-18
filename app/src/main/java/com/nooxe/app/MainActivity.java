@@ -110,13 +110,13 @@ public class MainActivity extends Activity {
                 popup.setWebViewClient(new WebViewClient() {
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView target, WebResourceRequest request) {
-                        openExternal(request.getUrl());
+                        openInBrowser(request.getUrl());
                         return true;
                     }
 
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView target, String url) {
-                        openExternal(Uri.parse(url));
+                        openInBrowser(Uri.parse(url));
                         return true;
                     }
                 });
