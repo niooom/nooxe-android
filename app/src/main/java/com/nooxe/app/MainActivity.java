@@ -34,6 +34,9 @@ public class MainActivity extends Activity {
 
     private static final int FILE_CHOOSER_REQUEST = 1001;
     private static final int MIC_REQUEST = 1002;
+    private static final int NOTIFICATIONS_REQUEST = 1003;
+
+    private static MainActivity current;
 
     private WebView webView;
     private ValueCallback<Uri[]> fileCallback;
@@ -42,10 +45,16 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        current = this;
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M
                 && checkSelfPermission(Manifest.permission.RECORD_AUDIO) != PackageManager.PERMISSION_GRANTED) {
             requestPermissions(new String[]{Manifest.permission.RECORD_AUDIO}, MIC_REQUEST);
+        }
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, NOTIFICATIONS_REQUEST);
         }
 
         webView = new WebView(this);
@@ -73,14 +82,15 @@ public class MainActivity extends Activity {
                 return handleNavigation(Uri.parse(url));
             }
 
-            // A finished sign-in is a fresh start, so the sign-in page is dropped
-            // from the back stack instead of showing up after login.
             @Override
             public void onPageFinished(WebView view, String url) {
+                // A finished sign-in is a fresh start, so the sign-in page is dropped
+                // from the back stack instead of showing up after login.
                 if (clearHistoryAfterLoad) {
                     clearHistoryAfterLoad = false;
                     view.clearHistory();
                 }
+                injectPushToken(NooxePush.token(getApplicationContext()));
             }
         });
 
@@ -114,7 +124,12 @@ public class MainActivity extends Activity {
 
         setContentView(webView);
 
-        if (!openAuthReturn(getIntent() == null ? null : getIntent().getData())) {
+        Intent launch = getIntent();
+        boolean opened = openAuthReturn(launch == null ? null : launch.getData());
+        if (!opened) {
+            opened = openChat(launch);
+        }
+        if (!opened) {
             webView.loadUrl(APP_URL);
         }
     }
@@ -123,7 +138,43 @@ public class MainActivity extends Activity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        openAuthReturn(intent == null ? null : intent.getData());
+        if (!openAuthReturn(intent == null ? null : intent.getData())) {
+            openChat(intent);
+        }
+    }
+
+    @Override
+    protected void onDestroy() {
+        if (current == this) {
+            current = null;
+        }
+        super.onDestroy();
+    }
+
+    /** Called by the push service when Firebase hands over a fresh device token. */
+    public static void deliverPushToken(final String token) {
+        final MainActivity activity = current;
+        if (activity == null || token == null || token.isEmpty()) {
+            return;
+        }
+        activity.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                activity.injectPushToken(token);
+            }
+        });
+    }
+
+    // Hands the device token to the web app, which stores it for the signed-in user.
+    private void injectPushToken(String token) {
+        if (webView == null || token == null || token.isEmpty()) {
+            return;
+        }
+        String literal = "'" + token.replaceAll("[^A-Za-z0-9_:.-]", "") + "'";
+        webView.evaluateJavascript(
+                "window.__nooxePushToken=" + literal + ";"
+                        + "window.dispatchEvent(new CustomEvent('nooxe:push-token',{detail:{token:" + literal + "}}));",
+                null);
     }
 
     // Provider sign-in only works in a real browser, so anything that starts one
@@ -218,6 +269,20 @@ public class MainActivity extends Activity {
         }
         clearHistoryAfterLoad = true;
         webView.loadUrl(target.build().toString());
+        return true;
+    }
+
+    // Opens the chat a tapped notification belongs to.
+    private boolean openChat(Intent intent) {
+        if (intent == null || !intent.hasExtra(NooxePush.EXTRA_CHAT_ID)) {
+            return false;
+        }
+        String chatId = intent.getStringExtra(NooxePush.EXTRA_CHAT_ID);
+        intent.removeExtra(NooxePush.EXTRA_CHAT_ID);
+        if (chatId == null || chatId.isEmpty()) {
+            return false;
+        }
+        webView.loadUrl(APP_URL + "chat/" + chatId);
         return true;
     }
 
