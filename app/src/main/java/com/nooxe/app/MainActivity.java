@@ -61,6 +61,9 @@ public class MainActivity extends Activity {
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
+        // Google sign-in and Drive permission reach the page as a popup, so the
+        // webview must be allowed to open one and pass its address on to a tab.
+        settings.setJavaScriptCanOpenWindowsAutomatically(true);
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
@@ -98,6 +101,32 @@ public class MainActivity extends Activity {
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
+            // No Google page ever renders inside the webview: the popup's own
+            // address goes to the browser, where the account chooser lives.
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, android.os.Message resultMsg) {
+                WebView popup = new WebView(view.getContext());
+                popup.getSettings().setJavaScriptEnabled(true);
+                popup.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView target, WebResourceRequest request) {
+                        openExternal(request.getUrl());
+                        return true;
+                    }
+
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView target, String url) {
+                        openExternal(Uri.parse(url));
+                        return true;
+                    }
+                });
+                android.webkit.WebView.WebViewTransport transport =
+                        (android.webkit.WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(popup);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
 
             @Override
             public void onPermissionRequest(final PermissionRequest request) {
