@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "247302232455",
+    "project_id": "niooox",
+    "storage_bucket": "niooox.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247302232455:android:f21b6b6e53e00818129b22",
+        "android_client_info": {
+          "package_name": "com.nooox.niooo"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCA9ImgEvr30u4HDMSRRwtddD-lI7GCMOk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247302232455:android:6d7c0a23f215ec1b129b22",
+        "android_client_info": {
+          "package_name": "com.nooxe.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCA9ImgEvr30u4HDMSRRwtddD-lI7GCMOk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
